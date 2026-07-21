@@ -1,0 +1,347 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyOY+o8fFQDPU6MTquzo9UJ1",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/miguelnunez-ai/oracle/blob/main/Proyecto%20RAG%20Mercado%20Central%2024h\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "!pip install -q -U streamlit pyngrok langchain-google-genai langchain-openai langchain-community langchain-text-splitters chromadb sentence-transformers pypdf pandas openpyxl"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "u18m4sZ5pwHa",
+        "outputId": "1f678576-4f2c-4a41-ab5e-9519b4cc7656"
+      },
+      "execution_count": 10,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\u001b[?25l   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m0.0/121.6 kB\u001b[0m \u001b[31m?\u001b[0m eta \u001b[36m-:--:--\u001b[0m\r\u001b[2K   \u001b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m \u001b[32m121.6/121.6 kB\u001b[0m \u001b[31m3.5 MB/s\u001b[0m eta \u001b[36m0:00:00\u001b[0m\n",
+            "\u001b[?25h"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "%%writefile app.py\n",
+        "import streamlit as st\n",
+        "import os\n",
+        "import tempfile\n",
+        "import pandas as pd\n",
+        "from langchain_community.document_loaders import PyPDFLoader\n",
+        "from langchain_core.documents import Document\n",
+        "from langchain_text_splitters import RecursiveCharacterTextSplitter\n",
+        "from langchain_community.vectorstores import Chroma\n",
+        "from langchain_community.embeddings import HuggingFaceEmbeddings\n",
+        "from langchain_google_genai import ChatGoogleGenerativeAI\n",
+        "from langchain_openai import ChatOpenAI\n",
+        "from langchain_core.prompts import ChatPromptTemplate\n",
+        "from langchain_core.output_parsers import StrOutputParser\n",
+        "from langchain_core.runnables import RunnablePassthrough\n",
+        "\n",
+        "# Configuración de interfaz en modo oscuro\n",
+        "st.set_page_config(page_title=\"Mercado Central 24h - Asistente IA\", layout=\"wide\", page_icon=\"🛒\")\n",
+        "\n",
+        "st.markdown(\"\"\"\n",
+        "    <style>\n",
+        "    .main { background-color: #0d1117; color: #ffffff; }\n",
+        "    .stApp { background-color: #0f141c; }\n",
+        "    div[data-testid=\"stSidebar\"] { background-color: #161b22; }\n",
+        "    .stChatMessage { border-radius: 12px; margin-bottom: 10px; }\n",
+        "    </style>\n",
+        "\"\"\", unsafe_allow_html=True)\n",
+        "\n",
+        "# ----------------- BARRA LATERAL -----------------\n",
+        "with st.sidebar:\n",
+        "    st.title(\"⚙️ Configuración & Archivos\")\n",
+        "\n",
+        "    # Selector de Proveedor de LLM\n",
+        "    proveedor = st.selectbox(\n",
+        "        \"Proveedor de IA\",\n",
+        "        [\"Google Gemini\", \"Groq\", \"OpenRouter\"]\n",
+        "    )\n",
+        "\n",
+        "    # Campo dinamico para API Key y Selección de Modelos\n",
+        "    if proveedor == \"Google Gemini\":\n",
+        "        api_key = st.text_input(\"Gemini API Key\", type=\"password\")\n",
+        "        modelo_seleccionado = st.selectbox(\"Modelo\", [\"gemini-2.0-flash\", \"gemini-1.5-flash\"])\n",
+        "    elif proveedor == \"Groq\":\n",
+        "        api_key = st.text_input(\"Groq API Key (console.groq.com)\", type=\"password\")\n",
+        "        modelo_seleccionado = st.selectbox(\"Modelo\", [\"llama-3.3-70b-versatile\", \"llama-3.1-8b-instant\", \"mixtral-8x7b-32768\"])\n",
+        "    elif proveedor == \"OpenRouter\":\n",
+        "        api_key = st.text_input(\"OpenRouter API Key (openrouter.ai)\", type=\"password\")\n",
+        "        modelo_seleccionado = st.selectbox(\"Modelo\", [\"meta-llama/llama-3.3-70b-instruct:free\", \"google/gemini-2.0-flash-exp:free\", \"deepseek/deepseek-r1:free\"])\n",
+        "\n",
+        "    st.markdown(\"---\")\n",
+        "\n",
+        "    st.subheader(\"📂 Cargar Documentos\")\n",
+        "    uploaded_files = st.file_uploader(\n",
+        "        \"Sube tus archivos (PDF o Excel)\",\n",
+        "        type=[\"pdf\", \"xlsx\", \"xls\"],\n",
+        "        accept_multiple_files=True\n",
+        "    )\n",
+        "\n",
+        "    procesar_btn = st.button(\"🚀 Procesar Documentos\")\n",
+        "\n",
+        "    st.markdown(\"---\")\n",
+        "    st.subheader(\"💡 Preguntas Frecuentes\")\n",
+        "    st.markdown(\"\"\"\n",
+        "    * ¿Cuál es el plazo para devoluciones?\n",
+        "    * ¿En qué pasillo está el Arroz Blanco?\n",
+        "    * ¿Cuántos días de vacaciones corresponden?\n",
+        "    * ¿A qué temperatura están las cámaras frías?\n",
+        "    \"\"\")\n",
+        "\n",
+        "# ----------------- PROCESAMIENTO RAG -----------------\n",
+        "@st.cache_resource(show_spinner=False)\n",
+        "def inicializar_embeddings():\n",
+        "    return HuggingFaceEmbeddings(model_name=\"all-MiniLM-L6-v2\")\n",
+        "\n",
+        "if \"vectorstore\" not in st.session_state:\n",
+        "    st.session_state.vectorstore = None\n",
+        "\n",
+        "if procesar_btn and uploaded_files and api_key:\n",
+        "    with st.spinner(\"Procesando y vectorizando documentos...\"):\n",
+        "        docs = []\n",
+        "        for file in uploaded_files:\n",
+        "            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:\n",
+        "                tmp.write(file.getvalue())\n",
+        "                tmp_path = tmp.name\n",
+        "\n",
+        "            # Procesar PDF\n",
+        "            if file.name.endswith(\".pdf\"):\n",
+        "                loader = PyPDFLoader(tmp_path)\n",
+        "                docs.extend(loader.load())\n",
+        "\n",
+        "            # Procesar Excel con pandas\n",
+        "            elif file.name.endswith((\".xlsx\", \".xls\")):\n",
+        "                excel_data = pd.read_excel(tmp_path, sheet_name=None)\n",
+        "                for sheet_name, df in excel_data.items():\n",
+        "                    texto_tabla = df.to_string(index=False)\n",
+        "                    doc = Document(\n",
+        "                        page_content=f\"Hoja de inventario ({sheet_name}):\\n\\n{texto_tabla}\",\n",
+        "                        metadata={\"source\": file.name, \"sheet\": sheet_name}\n",
+        "                    )\n",
+        "                    docs.append(doc)\n",
+        "\n",
+        "            os.remove(tmp_path)\n",
+        "\n",
+        "        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)\n",
+        "        chunks = text_splitter.split_documents(docs)\n",
+        "\n",
+        "        embeddings = inicializar_embeddings()\n",
+        "        st.session_state.vectorstore = Chroma.from_documents(chunks, embeddings)\n",
+        "        st.success(\"¡Base de conocimientos actualizada con éxito!\")\n",
+        "\n",
+        "# ----------------- INTERFAZ DE CHAT -----------------\n",
+        "st.title(\"🛒 Mercado Central 24h - Asistente IA\")\n",
+        "st.caption(\"Pregunta tus dudas sobre políticas, inventario, RRHH y seguridad del supermercado.\")\n",
+        "\n",
+        "if \"messages\" not in st.session_state:\n",
+        "    st.session_state.messages = [\n",
+        "        {\"role\": \"assistant\", \"content\": \"¡Hola! Soy tu asistente virtual de Mercado Central 24h. Carga tus documentos en la barra lateral para empezar a consultar.\"}\n",
+        "    ]\n",
+        "\n",
+        "for msg in st.session_state.messages:\n",
+        "    st.chat_message(msg[\"role\"]).write(msg[\"content\"])\n",
+        "\n",
+        "if prompt_input := st.chat_input(\"Ingresa tu pregunta aquí...\"):\n",
+        "    if not api_key:\n",
+        "        st.error(\"Por favor ingresa la API Key en la barra lateral.\")\n",
+        "    elif not st.session_state.vectorstore:\n",
+        "        st.warning(\"Por favor sube tus documentos y haz clic en 'Procesar Documentos'.\")\n",
+        "    else:\n",
+        "        st.session_state.messages.append({\"role\": \"user\", \"content\": prompt_input})\n",
+        "        st.chat_message(\"user\").write(prompt_input)\n",
+        "\n",
+        "        retriever = st.session_state.vectorstore.as_retriever(search_kwargs={\"k\": 3})\n",
+        "\n",
+        "        # Inicialización del modelo según proveedor seleccionado\n",
+        "        if proveedor == \"Google Gemini\":\n",
+        "            os.environ[\"GOOGLE_API_KEY\"] = api_key\n",
+        "            llm = ChatGoogleGenerativeAI(model=modelo_seleccionado, temperature=0)\n",
+        "\n",
+        "        elif proveedor == \"Groq\":\n",
+        "            llm = ChatOpenAI(\n",
+        "                model_name=modelo_seleccionado,\n",
+        "                openai_api_key=api_key,\n",
+        "                openai_api_base=\"https://api.groq.com/openai/v1\",\n",
+        "                temperature=0\n",
+        "            )\n",
+        "\n",
+        "        elif proveedor == \"OpenRouter\":\n",
+        "            llm = ChatOpenAI(\n",
+        "                model_name=modelo_seleccionado,\n",
+        "                openai_api_key=api_key,\n",
+        "                openai_api_base=\"https://openrouter.ai/api/v1\",\n",
+        "                temperature=0,\n",
+        "                default_headers={\n",
+        "                    \"HTTP-Referer\": \"https://localhost:8501\",\n",
+        "                    \"X-Title\": \"Mercado Central 24h Assistant\"\n",
+        "                }\n",
+        "            )\n",
+        "\n",
+        "        sys_prompt = (\n",
+        "            \"Eres un asistente virtual experto del supermercado Mercado Central 24h.\\n\"\n",
+        "            \"Responde únicamente usando la información del contexto proporcionado.\\n\"\n",
+        "            \"Sé conciso y directo (máximo 2-3 oraciones).\\n\\n\"\n",
+        "            \"Contexto:\\n{context}\\n\\n\"\n",
+        "            \"Pregunta: {question}\"\n",
+        "        )\n",
+        "        prompt_template = ChatPromptTemplate.from_template(sys_prompt)\n",
+        "\n",
+        "        def format_docs(docs):\n",
+        "            return \"\\n\\n\".join(doc.page_content for doc in docs)\n",
+        "\n",
+        "        rag_chain = (\n",
+        "            {\"context\": retriever | format_docs, \"question\": RunnablePassthrough()}\n",
+        "            | prompt_template\n",
+        "            | llm\n",
+        "            | StrOutputParser()\n",
+        "        )\n",
+        "\n",
+        "        with st.chat_message(\"assistant\"):\n",
+        "            with st.spinner(\"Buscando en la base de conocimientos...\"):\n",
+        "                try:\n",
+        "                    respuesta = rag_chain.invoke(prompt_input)\n",
+        "                    st.write(respuesta)\n",
+        "                    st.session_state.messages.append({\"role\": \"assistant\", \"content\": respuesta})\n",
+        "                except Exception as e:\n",
+        "                    if \"429\" in str(e) or \"RESOURCE_EXHAUSTED\" in str(e) or \"rate_limit\" in str(e).lower():\n",
+        "                        st.error(\"⏳ Has alcanzado el límite de consultas por minuto de la API seleccionada. Espera un momento e inténtalo de nuevo o cambia de proveedor.\")\n",
+        "                    else:\n",
+        "                        st.error(f\"Ocurrió un error con el proveedor: {e}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "Wh9yEJO_p2eh",
+        "outputId": "7513633d-ca25-4b7f-d22e-afd53dac6190"
+      },
+      "execution_count": 11,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Overwriting app.py\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from pyngrok import ngrok\n",
+        "import subprocess\n",
+        "\n",
+        "# 1. Limpieza de túneles colgados\n",
+        "ngrok.kill()\n",
+        "\n",
+        "# 2. Configuración de Token\n",
+        "NGROK_TOKEN = \"3GmiTutv6yv8ZxOkYS8qttCqCpm_5ymNfBndA2j3hyP9rszwL\"\n",
+        "ngrok.set_auth_token(NGROK_TOKEN)\n",
+        "\n",
+        "# 3. Lanzar Streamlit en puerto 8501\n",
+        "subprocess.Popen([\"streamlit\", \"run\", \"app.py\", \"--server.port\", \"8501\"])\n",
+        "\n",
+        "# 4. Crear túnel público\n",
+        "public_url = ngrok.connect(8501)\n",
+        "print(f\"👉 Abre la aplicación en esta URL: {public_url}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "NAN9RJTQp7gC",
+        "outputId": "87cb50b1-beed-4f3f-954b-44370295e351"
+      },
+      "execution_count": 13,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "👉 Abre la aplicación en esta URL: NgrokTunnel: \"https://nimble-deviant-citizen.ngrok-free.dev\" -> \"http://localhost:8501\"\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "%%writefile requirements.txt\n",
+        "streamlit\n",
+        "pyngrok\n",
+        "langchain-google-genai\n",
+        "langchain-openai\n",
+        "langchain-community\n",
+        "langchain-text-splitters\n",
+        "chromadb\n",
+        "sentence-transformers\n",
+        "pypdf\n",
+        "pandas\n",
+        "openpyxl\n",
+        "\n",
+        "%%writefile .gitignore\n",
+        "__pycache__/\n",
+        "*.pyc\n",
+        ".env\n",
+        "chroma_db/\n",
+        ".streamlit/\n",
+        "\n",
+        "%%writefile README.md\n",
+        "# 🛒 Asistente IA RAG - Mercado Central 24h\n",
+        "Sistema de asistencia virtual basado en RAG para consultas de inventario, RRHH y políticas."
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "L48fciR31dYB",
+        "outputId": "13c4c40d-a22d-4729-d1e9-45173df2e7ac"
+      },
+      "execution_count": 16,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Overwriting requirements.txt\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
