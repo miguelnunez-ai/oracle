@@ -1,5 +1,7 @@
 # 🛒 Asistente IA RAG - Mercado Central 24h
 
+> ⚠️ **Nota de Uso:** Para utilizar este asistente, **debes colocar tu propia API Key** en la barra lateral de la aplicación. Cuentas con **tres opciones distintas de proveedores**: **Google Gemini**, **Groq** y **OpenRouter**. Además, **debes cargar los archivos (PDF o Excel) que deseas consultar** para que el sistema construya la base de conocimiento en tiempo real.
+
 Sistema de asistencia virtual basado en **RAG (Retrieval-Augmented Generation)** diseñado para la gestión de consultas sobre inventario, recursos humanos, políticas y seguridad del supermercado **Mercado Central 24h**.
 
 ## 🚀 Características Principales
