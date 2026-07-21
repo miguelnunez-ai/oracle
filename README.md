@@ -1,19 +1,22 @@
-This directory includes a few sample datasets to get you started.
+# 🛒 Asistente IA RAG - Mercado Central 24h
 
-*   `california_housing_data*.csv` is California housing data from the 1990 US
-    Census; more information is available at:
-    https://docs.google.com/document/d/e/2PACX-1vRhYtsvc5eOR2FWNCwaBiKL6suIOrxJig8LcSBbmCbyYsayia_DvPOOBlXZ4CAlQ5nlDD8kTaIDRwrN/pub
+Sistema de asistencia virtual basado en **RAG (Retrieval-Augmented Generation)** diseñado para la gestión de consultas sobre inventario, recursos humanos, políticas y seguridad del supermercado **Mercado Central 24h**.
 
-*   `mnist_*.csv` is a small sample of the
-    [MNIST database](https://en.wikipedia.org/wiki/MNIST_database), which is
-    described at: http://yann.lecun.com/exdb/mnist/
+## 🚀 Características Principales
+- **Soporte Multi-Proveedor de LLM:** Integración dinámica para **Google Gemini**, **Groq** y **OpenRouter** con selección de modelos e ingreso de API Keys desde la interfaz.
+- **Procesamiento Multiformato:** Lectura y extracción semántica de documentos en formato PDF y hojas de cálculo Excel (`.xlsx`, `.xls`).
+- **Embeddings Locales:** Uso del modelo `all-MiniLM-L6-v2` mediante Sentence-Transformers para realizar búsquedas vectoriales rápidas y sin consumir cuotas de API.
+- **Interfaz Web Interactiva:** Desarrollada en **Streamlit** con tema oscuro optimizado y despliegue público rápido vía **ngrok**.
 
-*   `anscombe.json` contains a copy of
-    [Anscombe's quartet](https://en.wikipedia.org/wiki/Anscombe%27s_quartet); it
-    was originally described in
+## 🛠️ Tecnologías Utilizadas
+- **Python 3.10+**
+- **LangChain** (LCEL)
+- **Streamlit**
+- **ChromaDB**
+- **Pandas & PyPDF**
 
-    Anscombe, F. J. (1973). 'Graphs in Statistical Analysis'. American
-    Statistician. 27 (1): 17-21. JSTOR 2682899.
-
-    and our copy was prepared by the
-    [vega_datasets library](https://github.com/altair-viz/vega_datasets/blob/4f67bdaad10f45e3549984e17e1b3088c731503d/vega_datasets/_data/anscombe.json).
+## 🔧 Instalación y Ejecución
+1. Clona el repositorio:
+   ```bash
+   git clone [https://github.com/TU_USUARIO/mercado-central-asistente.git](https://github.com/TU_USUARIO/mercado-central-asistente.git)
+   cd mercado-central-asistente
