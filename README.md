@@ -20,6 +20,7 @@ El sistema procesa documentos corporativos en formatos **PDF** y **Excel**, conv
 
 ```text
 ├── app.py                  # Código principal de la aplicación Streamlit
+├── requirements.txt        # Dependencias del proyecto
 ├── .env                    # (Opcional) Archivo para almacenar las API Keys de forma segura
 ├── knowledge/              # Directorio para la base de conocimientos fija
 │   ├── politicas_empresa_1.pdf
@@ -41,7 +42,7 @@ Si estás corriendo este proyecto en un cuaderno de Google Colab, la aplicación
 1. **Instalar dependencias:**
    Ejecuta la siguiente celda en tu cuaderno:
    ```bash
-   !pip install pyngrok streamlit pandas python-dotenv langchain-community langchain-core langchain-text-splitters langchain-google-genai langchain-openai pypdf openpyxl chromadb sentence-transformers
+   !pip install -r requirements.txt
    ```
 
 2. **Configurar archivos:**
@@ -72,7 +73,7 @@ Si deseas correr este proyecto en tu propia computadora:
    ```
 3. Instala las dependencias:
    ```bash
-   pip install streamlit pandas python-dotenv langchain-community langchain-core langchain-text-splitters langchain-google-genai langchain-openai pypdf openpyxl chromadb sentence-transformers
+   pip install -r requirements.txt
    ```
 4. Crea la carpeta `knowledge` y coloca tus PDFs y archivos Excel dentro de ella.
 5. Inicia la aplicación:
@@ -83,6 +84,8 @@ Si deseas correr este proyecto en tu propia computadora:
 ---
 
 ## ⚙️ Uso y Configuración de API Keys
+
+<h3 style="color:red;">⚠️ ATENCIÓN: debes colocar tus claves API, porque fueron retiradas por motivo de seguridad.</h3>
 
 Una vez que abras la interfaz del asistente en tu navegador:
 
